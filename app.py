@@ -31,7 +31,7 @@ def load_trained_model():
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
 def is_tomato_leaf_strict(image):
-    img_small = image.resize((120, 120)) 
+    img_small = image.resize((120, 120))
     arr = np.array(img_small).astype(float)
     r, g, b = arr[:,:,0], arr[:,:,1], arr[:,:,2]
     
@@ -39,37 +39,30 @@ def is_tomato_leaf_strict(image):
     min_rgb = np.minimum(np.minimum(r,g), b)
     sat = (max_rgb - min_rgb) / (max_rgb + 1e-5)
     
-    
     white_mask = (max_rgb > 195) & (sat < 0.25)
-    white_ratio = np.sum(white_mask) / 14400.0
-    if white_ratio > 0.40:
-        return False, "Document/Poster! Upload only tomato leaf 📄"
-
     valid = ~white_mask
     
     
-    skin1 = (r > 80) & (g > 25) & (b > 10) & (r > g) & (r > b) & (r-g > 5) & (r-g < 90) & valid
-    skin2 = (r > 150) & (g > 90) & (b > 60) & (r > g) & (r > b) & valid 
-    skin = skin1 | skin2
+    skin = (r > 95) & (g > 35) & (b > 15) & (r > g+15) & (r > b+10) & (r-g > 15) & (r-g < 85) & valid
     skin_ratio = np.sum(skin) / 14400.0
     
     
-    if skin_ratio > 0.02:
+    is_green = (g == max_rgb) & (sat > 0.18) & (max_rgb > 30) & (max_rgb < 230) & valid
+    is_yellow_green = (g > 50) & (r > 40) & (b < 135) & (g >= r*0.6) & (sat > 0.16) & valid
+    green_ratio = (np.sum(is_green) + np.sum(is_yellow_green)*0.7) / 14400.0
+
+    
+    if skin_ratio > 0.06:  
+        return False, "Human photo not allowed! Upload only tomato leaf 🧑‍🌾❌"
+    
+    if skin_ratio > 0.03 and green_ratio < 0.18: 
         return False, "Human photo not allowed! Upload only tomato leaf 🧑‍🌾❌"
 
-    
-    dark_pixels = (max_rgb < 65) & valid
-    dark_ratio = np.sum(dark_pixels) / 14400.0
-    if dark_ratio > 0.15 and skin_ratio > 0.01: # 
-        return False, "Person photo! Only leaf allowed 👔❌"
+    white_ratio = np.sum(white_mask) / 14400.0
+    if white_ratio > 0.45:
+        return False, "Document/Poster! Upload only leaf 📄"
 
-    
-    is_green = (g == max_rgb) & (sat > 0.20) & (max_rgb > 30) & (max_rgb < 230) & valid
-    is_yellow_green = (g > 50) & (r > 40) & (b < 135) & (g >= r*0.6) & (sat > 0.18) & valid
-    green_ratio = (np.sum(is_green) + np.sum(is_yellow_green)*0.8) / 14400.0
-
-    
-    if green_ratio < 0.14:
+    if green_ratio < 0.12:
         return False, "Not a leaf! Upload only tomato leaf 🍃"
 
     return True, "OK"
@@ -105,4 +98,4 @@ with right_col:
             confidence = float(scores[pred_index]) * 100
             st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
     elif uploaded is None:
-        st.info(" Upload only tomato images")
+        st.info(" Upload tomato leaf image")
