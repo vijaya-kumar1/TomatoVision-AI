@@ -36,16 +36,27 @@ CLASS_NAMES = ["Bacterial_spot","Early_blight","Late_blight","Leaf_Mold","Septor
 def load_trained_model():
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
-def is_tomato_leaf(image):
+def is_tomato_leaf_strict(image):
     img_small = image.resize((100, 100))
     arr = np.array(img_small)
+    r, g, b = arr[:,:,0].astype(int), arr[:,:,1].astype(int), arr[:,:,2].astype(int)
+    
+    
     white_pixels = np.sum(np.all(arr > 200, axis=2)) / 10000
-    if white_pixels > 0.6:
-        return False, "This looks like a document/paper, not a leaf! 📄"
-    r, g, b = arr[:,:,0], arr[:,:,1], arr[:,:,2]
+    if white_pixels > 0.5:
+        return False, "This is a document/paper, not a leaf! 📄"
+
+    
+    skin = (r > 95) & (g > 40) & (b > 20) & (r > g) & (r > b) & (np.abs(r-g) < 45)
+    skin_ratio = np.sum(skin) / 10000
+    if skin_ratio > 0.12:  
+        return False, "Human photo detected! Please upload only leaf 🧑‍🌾"
+
+    
     green_dominant = np.sum((g > r+10) & (g > b+10)) / 10000
-    if green_dominant < 0.15:
-        return False, "No leaf found! Please upload only tomato leaf 🍃"
+    if green_dominant < 0.20: 
+        return False, "Not a leaf image! Upload only tomato leaf 🍃"
+
     return True, "OK"
 
 left_col, right_col = st.columns([1, 1.2], gap="large")
@@ -63,9 +74,9 @@ with left_col:
 
 with right_col:
     if uploaded is not None and predict_btn:
-        is_leaf, msg = is_tomato_leaf(image)
+        is_leaf, msg = is_tomato_leaf_strict(image)
         if not is_leaf:
-            st.markdown(f'<div class="error-box"><div class="error-text">❌ {msg}<br><br>Upload only tomato leaf photo!</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="error-box"><div class="error-text">❌ {msg}<br><br>⚠️ Leaf image only allowed!</div></div>', unsafe_allow_html=True)
         else:
             model = load_trained_model()
             input_size = int(model.input_shape[1])
@@ -77,7 +88,11 @@ with right_col:
             pred_index = int(np.argmax(scores))
             pred_name = CLASS_NAMES[pred_index]
             confidence = float(scores[pred_index]) * 100
-            if confidence < 70:
-                st.warning(f"⚠️ Low confidence ({confidence:.2f}%). Image may be unclear.")
-            st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
-    
+            
+            
+            if confidence < 75:
+                st.markdown(f'<div class="error-box"><div class="error-text">❌ Unclear image! Confidence only {confidence:.1f}%<br>Please upload clear tomato leaf photo!</div></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
+    elif uploaded is None:
+        st.info("👈 Upload tomato leaf on left")
