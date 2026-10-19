@@ -36,28 +36,36 @@ CLASS_NAMES = ["Bacterial_spot","Early_blight","Late_blight","Leaf_Mold","Septor
 def load_trained_model():
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
+
 def is_tomato_leaf_strict(image):
     img_small = image.resize((100, 100))
-    arr = np.array(img_small)
-    r, g, b = arr[:,:,0].astype(int), arr[:,:,1].astype(int), arr[:,:,2].astype(int)
-    
+    arr = np.array(img_small).astype(float)
+    r, g, b = arr[:,:,0], arr[:,:,1], arr[:,:,2]
     
     white_pixels = np.sum(np.all(arr > 200, axis=2)) / 10000
-    if white_pixels > 0.5:
+    if white_pixels > 0.55:
         return False, "This is a document/paper, not a leaf! 📄"
 
+    green_pixels_1 = np.sum((g > r) & (g > b) & (g > 30)) / 10000
+    max_rgb = np.maximum(np.maximum(r,g), b)
+    min_rgb = np.minimum(np.minimum(r,g), b)
+    is_green_hue = (g == max_rgb) & (max_rgb > 40) & ((max_rgb - min_rgb) > 10)
+    green_pixels_2 = np.sum(is_green_hue) / 10000
+    total_green = max(green_pixels_1, green_pixels_2)
     
-    skin = (r > 95) & (g > 40) & (b > 20) & (r > g) & (r > b) & (np.abs(r-g) < 45)
+    if total_green > 0.15:
+        return True, "OK"
+    
+    skin = (r > 90) & (g > 40) & (b > 20) & (r > g) & (r > b) & (r-g > 10) & (r-g < 60)
     skin_ratio = np.sum(skin) / 10000
-    if skin_ratio > 0.12:  
-        return False, "Human photo detected! Please upload only leaf  🧑‍🌾"
+    if skin_ratio > 0.20 and total_green < 0.08:
+        return False, "Human photo detected! Please upload only leaf 🧑‍🌾"
 
-    
-    green_dominant = np.sum((g > r+10) & (g > b+10)) / 10000
-    if green_dominant < 0.20: 
+    if total_green < 0.12:
         return False, "Not a leaf image! Upload only tomato leaf 🍃"
 
     return True, "OK"
+
 
 left_col, right_col = st.columns([1, 1.2], gap="large")
 
@@ -88,11 +96,9 @@ with right_col:
             pred_index = int(np.argmax(scores))
             pred_name = CLASS_NAMES[pred_index]
             confidence = float(scores[pred_index]) * 100
-            
-            
             if confidence < 75:
                 st.markdown(f'<div class="error-box"><div class="error-text">❌ Unclear image! Confidence only {confidence:.1f}%<br>Please upload clear tomato leaf photo!</div></div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
     elif uploaded is None:
-        st.info("Upload only Tomato leaf images")
+        st.info(" Upload tomato leaf on onlly")
