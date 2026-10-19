@@ -19,7 +19,7 @@ st.markdown("""
         border-radius: 12px; padding: 30px; text-align: center; margin-top: 20px;
     }
     .disease-text { color: #2E7D32; font-size: 28px; font-weight: bold; }
-    .error-text { color: #C62828; font-size: 20px; font-weight: bold; }
+    .error-text { color: #C62828; font-size: 22px; font-weight: bold; }
     .confidence-text { color: #1565C0; font-size: 22px; font-weight: bold; margin-top: 15px;}
     .stButton>button { background-color: #FF4B4B; color: white; width: 100%; border-radius: 8px; font-weight: bold; height: 45px;}
 </style>
@@ -41,28 +41,39 @@ def is_tomato_leaf_strict(image):
     arr = np.array(img_small).astype(float)
     r, g, b = arr[:,:,0], arr[:,:,1], arr[:,:,2]
     
-    white_pixels = np.sum(np.all(arr > 210, axis=2)) / 10000.0
-    if white_pixels > 0.60:
-        return False, "This is a document/paper, not a leaf! 📄"
-
-    # Green check - yellowish disease leaf kooda edukkum
-    green_check1 = np.sum((g > r*0.8) & (g > b*0.8) & (g > 25)) / 10000.0
     max_rgb = np.maximum(np.maximum(r,g), b)
     min_rgb = np.minimum(np.minimum(r,g), b)
-    is_yellow_green = (g >= r*0.7) & (g >= b*0.6) & (max_rgb > 35)
-    green_check2 = np.sum(is_yellow_green) / 10000.0
-    total_green = max(green_check1, green_check2)
+    sat = (max_rgb - min_rgb) / (max_rgb + 1e-5)  
     
-    if total_green > 0.12:
-        return True, "OK"
-    
-    # Human check - only if green romba kammi
-    skin = (r > 90) & (g > 40) & (b > 20) & (r > g) & (r > b) & (r-g > 10) & (r-g < 60)
-    skin_ratio = np.sum(skin) / 10000.0
-    if skin_ratio > 0.25 and total_green < 0.06:
-        return False, "Human photo detected! Please upload only leaf 🧑‍🌾"
 
-    if total_green < 0.08:
+    white_mask = (max_rgb > 200) & (sat < 0.20)
+    white_ratio = np.sum(white_mask) / 10000.0
+    if white_ratio > 0.50:
+        return False, "Document/Poster detected! Upload only tomato leaf 📄"
+
+    
+    valid = ~white_mask
+    
+    
+    skin = (r > 90) & (g > 40) & (b > 20) & (r > g) & (r > b) & (r-g > 10) & (r-g < 70) & valid
+    skin_ratio = np.sum(skin) / 10000.0
+    if skin_ratio > 0.10:  
+        return False, "Human/Poster detected! Please upload only leaf 🧑‍🌾"
+
+    
+    blue_dominant = (b > r+20) & (b > g) & valid
+    blue_ratio = np.sum(blue_dominant) / 10000.0
+    if blue_ratio > 0.25:
+        return False, "Not a leaf! Upload only tomato leaf 🍃"
+
+    
+    is_green = (g == max_rgb) & (sat > 0.15) & (max_rgb > 30) & (max_rgb < 230) & valid
+    
+    is_yellow_leaf = (g > 60) & (r > 50) & (b < 120) & (g > b) & (r > b*0.8) & (sat > 0.15) & valid
+    
+    green_ratio = (np.sum(is_green) + np.sum(is_yellow_leaf)*0.8) / 10000.0
+    
+    if green_ratio < 0.12:
         return False, "Not a leaf image! Upload only tomato leaf 🍃"
 
     return True, "OK"
@@ -96,10 +107,6 @@ with right_col:
             pred_index = int(np.argmax(scores))
             pred_name = CLASS_NAMES[pred_index]
             confidence = float(scores[pred_index]) * 100
-            
-            # Confidence kammi na kooda result kaamikkanum, warning mattum
             st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
-            if confidence < 60:
-                st.warning(f"⚠️ Low confidence - image may be blurry. Try clearer photo!")
     elif uploaded is None:
-        st.info(" Upload tomato leaf image")
+        st.info("Upload tomato leaf images ")
