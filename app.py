@@ -95,4 +95,4 @@ with right_col:
             else:
                 st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
     elif uploaded is None:
-        st.info("👈 Upload tomato leaf on left")
+        st.info("Upload only Tomato leaf images")
