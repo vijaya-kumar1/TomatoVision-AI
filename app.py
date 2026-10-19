@@ -1,112 +1,304 @@
+import glob
 import os
+
+
+os.environ["USE_TF"] = "0"
+
 import numpy as np
-import tensorflow as tf
+import pandas as pd
 import streamlit as st
+import tensorflow as tf
 from PIL import Image, ImageOps
+
 
 st.set_page_config(page_title="TomatoVision AI", page_icon="🍅", layout="wide")
 
-st.markdown("""
-<style>
-    .main-title { text-align: center; font-size: 32px; font-weight: bold; }
-    .red-text { color: #FF3131; }
-    .result-box {
-        background-color: #E8F5E9; border: 2px solid #66BB6A;
-        border-radius: 12px; padding: 40px; text-align: center; margin-top: 20px;
-    }
-    .error-box {
-        background-color: #FFEBEE; border: 2px solid #EF5350;
-        border-radius: 12px; padding: 30px; text-align: center; margin-top: 20px;
-    }
-    .disease-text { color: #2E7D32; font-size: 28px; font-weight: bold; }
-    .error-text { color: #C62828; font-size: 22px; font-weight: bold; }
-    .confidence-text { color: #1565C0; font-size: 22px; font-weight: bold; margin-top: 15px;}
-    .stButton>button { background-color: #FF4B4B; color: white; width: 100%; border-radius: 8px; font-weight: bold; height: 45px;}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown('<div class="main-title">🍅 TomatoVision <span class="red-text">AI</span></div>', unsafe_allow_html=True)
-st.markdown("---")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "tomato_model_v4.keras")
-CLASS_NAMES = ["Bacterial_spot","Early_blight","Late_blight","Leaf_Mold","Septoria_leaf_spot","Spider_mites","Target_Spot","Yellow_Leaf_Curl_Virus","Mosaic_virus","healthy"]
+
+
+CLASS_NAMES = [
+    "Bacterial_spot",
+    "Early_blight",
+    "Late_blight",
+    "Leaf_Mold",
+    "Septoria_leaf_spot",
+    "Spider_mites",
+    "Target_Spot",
+    "Yellow_Leaf_Curl_Virus",
+    "Mosaic_virus",
+    "healthy",
+]
+
+DISPLAY_NAMES = {
+    "Bacterial_spot": "Bacterial Spot",
+    "Early_blight": "Early Blight",
+    "Late_blight": "Late Blight",
+    "Leaf_Mold": "Leaf Mold",
+    "Septoria_leaf_spot": "Septoria Leaf Spot",
+    "Spider_mites": "Spider Mites",
+    "Target_Spot": "Target Spot",
+    "Yellow_Leaf_Curl_Virus": "Yellow Leaf Curl Virus",
+    "Mosaic_virus": "Mosaic Virus",
+    "healthy": "Healthy Leaf",
+}
+
+
+LEAF_THRESHOLD = 0.5
+
+LEAF_PROMPTS = [
+    "a close-up photo of a tomato leaf",
+    "a photo of a diseased tomato plant leaf",
+    "a photo of a green plant leaf",
+    "a photo of a leaf with brown spots",
+]
+OTHER_PROMPTS = [
+    "a photo of a person",
+    "a photo of an animal",
+    "a photo of a building",
+    "a photo of food",
+    "a photo of a car",
+    "a photo of a room interior",
+    "a screenshot or a document",
+    "a photo of an object on a table",
+    "a photo of a landscape or sky",
+    "a photo of a flower",
+    "a photo of a fruit",
+    "a cartoon or a drawing",
+]
+ALL_PROMPTS = LEAF_PROMPTS + OTHER_PROMPTS
+
+
+# ======================================================
+# 3. LOAD MODELS
+# ======================================================
+def find_model():
+    """Newest .keras file in the same folder as app.py."""
+    matches = glob.glob(os.path.join(BASE_DIR, "*.keras"))
+    if not matches:
+        return None
+    return max(matches, key=os.path.getmtime)
+
 
 @st.cache_resource
-def load_trained_model():
-    return tf.keras.models.load_model(MODEL_PATH, compile=False)
+def load_model(path):
+    return tf.keras.models.load_model(path, compile=False)
 
-def is_tomato_leaf_strict(image):
-    img_small = image.resize((100, 100))
-    arr = np.array(img_small).astype(float)
-    r, g, b = arr[:,:,0], arr[:,:,1], arr[:,:,2]
-    
-    max_rgb = np.maximum(np.maximum(r,g), b)
-    min_rgb = np.minimum(np.minimum(r,g), b)
-    sat = (max_rgb - min_rgb) / (max_rgb + 1e-5)  
-    
 
-    white_mask = (max_rgb > 200) & (sat < 0.20)
-    white_ratio = np.sum(white_mask) / 10000.0
-    if white_ratio > 0.50:
-        return False, "Document/Poster detected! Upload only tomato leaf 📄"
+@st.cache_resource(show_spinner="First time only: loading leaf-check model (about 600 MB download)...")
+def load_clip():
+    """Returns (model, processor) or None if torch / transformers are not installed."""
+    try:
+        from transformers import CLIPModel, CLIPProcessor
 
-    
-    valid = ~white_mask
-    
-    
-    skin = (r > 90) & (g > 40) & (b > 20) & (r > g) & (r > b) & (r-g > 10) & (r-g < 70) & valid
-    skin_ratio = np.sum(skin) / 10000.0
-    if skin_ratio > 0.10:  
-        return False, "Human/Poster detected! Please upload only leaf 🧑‍🌾"
+        clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        clip_model.eval()
+        return clip_model, clip_processor
+    except Exception:
+        return None
 
-    
-    blue_dominant = (b > r+20) & (b > g) & valid
-    blue_ratio = np.sum(blue_dominant) / 10000.0
-    if blue_ratio > 0.25:
-        return False, "Not a leaf! Upload only tomato leaf 🍃"
 
-    
-    is_green = (g == max_rgb) & (sat > 0.15) & (max_rgb > 30) & (max_rgb < 230) & valid
-    
-    is_yellow_leaf = (g > 60) & (r > 50) & (b < 120) & (g > b) & (r > b*0.8) & (sat > 0.15) & valid
-    
-    green_ratio = (np.sum(is_green) + np.sum(is_yellow_leaf)*0.8) / 10000.0
-    
-    if green_ratio < 0.12:
-        return False, "Not a leaf image! Upload only tomato leaf 🍃"
+# ======================================================
+# 4. HELPERS
+# ======================================================
+def check_leaf(image):
+    """Returns (is_leaf, leaf_score). Returns (None, None) if the check is not available."""
+    loaded = load_clip()
+    if loaded is None:
+        return None, None
 
-    return True, "OK"
+    import torch
 
+    clip_model, clip_processor = loaded
+    inputs = clip_processor(
+        text=ALL_PROMPTS, images=image.convert("RGB"), return_tensors="pt", padding=True
+    )
+    with torch.no_grad():
+        logits = clip_model(**inputs).logits_per_image[0]
+    probs = torch.softmax(logits, dim=0).numpy()
+    leaf_score = float(probs[: len(LEAF_PROMPTS)].sum())
+    return leaf_score >= LEAF_THRESHOLD, leaf_score
+
+
+def prepare_image(image, size):
+    image = ImageOps.exif_transpose(image).convert("RGB")
+    image = image.resize((size, size))
+    # NO /255 here. The model already has preprocessing inside it.
+    array = np.asarray(image, dtype=np.float32)
+    return np.expand_dims(array, axis=0)
+
+
+# ======================================================
+# 5. STYLE
+# ======================================================
+st.markdown(
+    """
+<style>
+.stApp { background-color: #10131a; color: white; }
+h1 { color: #ff5555; }
+.result-card {
+    background-color: #1c222d;
+    padding: 25px;
+    border-radius: 15px;
+    border: 1px solid #343b49;
+}
+.small-label { color: #b9c6d8; font-size: 16px; }
+.result-name { color: #ffffff; font-size: 28px; font-weight: bold; }
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+st.title("🍅 TomatoVision AI")
+st.caption("Tomato Leaf Disease Detection | Upload a leaf image to predict its class")
+st.divider()
+
+# ======================================================
+# 6. LAYOUT
+# ======================================================
 left_col, right_col = st.columns([1, 1.2], gap="large")
 
+image = None
+predict_button = False
+
 with left_col:
-    st.write("**Choose an image**")
-    uploaded = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
-    if uploaded is not None:
-        image = ImageOps.exif_transpose(Image.open(uploaded)).convert("RGB")
-        st.image(image, caption="Uploaded Image", width=350)
-        predict_btn = st.button("🔵 Predict Disease")
+    st.subheader("📷 Upload Tomato Leaf")
+    uploaded_file = st.file_uploader(
+        "Choose an image (JPG, JPEG, PNG)", type=["jpg", "jpeg", "png"]
+    )
+
+    if uploaded_file is not None:
+        try:
+            image = Image.open(uploaded_file)
+            st.image(image, caption="Uploaded image")
+            predict_button = st.button("🔍 Predict Disease", type="primary")
+        except Exception as e:
+            st.error(f"Unable to open image: {e}")
+            image = None
     else:
-        predict_btn = False
-        image = None
+        st.info("Upload a tomato leaf image to begin.")
 
 with right_col:
-    if uploaded is not None and predict_btn:
-        is_leaf, msg = is_tomato_leaf_strict(image)
-        if not is_leaf:
-            st.markdown(f'<div class="error-box"><div class="error-text">❌ {msg}<br><br>⚠️ Leaf image only allowed!</div></div>', unsafe_allow_html=True)
+    st.subheader("🧪 Prediction Result")
+
+    if image is not None and predict_button:
+        model_path = find_model()
+
+        if model_path is None:
+            st.error("Model file not found.")
+            st.info(
+                "Put your .keras model file (example tomato_model_v4.keras) in the "
+                f"same folder as app.py ({BASE_DIR})."
+            )
         else:
-            model = load_trained_model()
-            input_size = int(model.input_shape[1])
-            img_resized = image.resize((input_size, input_size))
-            image_array = np.asarray(img_resized, dtype=np.float32)[None, ...]
-            scores = model.predict(image_array, verbose=0)[0]
-            if not np.isclose(scores.sum(), 1.0, atol=1e-3):
-                scores = tf.nn.softmax(scores).numpy()
-            pred_index = int(np.argmax(scores))
-            pred_name = CLASS_NAMES[pred_index]
-            confidence = float(scores[pred_index]) * 100
-            st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
-    elif uploaded is None:
-        st.info("Upload tomato leaf images ")
+            try:
+                # ---------- Step 1: is it a leaf photo? ----------
+                is_leaf, leaf_score = check_leaf(image)
+
+                if is_leaf is False:
+                    st.markdown(
+                        f"""
+                        <div class="result-card">
+                            <div class="small-label">Result</div>
+                            <div class="result-name">Not a leaf image ❌</div>
+                            <p>This photo does not look like a tomato leaf
+                            (leaf score: {leaf_score * 100:.0f}%).<br>
+                            Please upload a clear photo of a tomato leaf.</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    if is_leaf is None:
+                        st.info(
+                            "Leaf check is not active. To turn it on, run: "
+                            "pip install torch transformers  (then restart the app)."
+                        )
+
+                    # ---------- Step 2: predict the disease ----------
+                    with st.spinner("Analyzing leaf image..."):
+                        model = load_model(model_path)
+                        size = model.input_shape[1] or 224
+                        batch = prepare_image(image, size)
+                        scores = np.asarray(model.predict(batch, verbose=0)[0]).reshape(-1)
+
+                    if len(scores) != len(CLASS_NAMES):
+                        st.error(
+                            f"Model gives {len(scores)} outputs but CLASS_NAMES has "
+                            f"{len(CLASS_NAMES)} names."
+                        )
+                    else:
+                        if not np.isclose(scores.sum(), 1.0, atol=1e-3):
+                            scores = tf.nn.softmax(scores).numpy()
+
+                        top_index = int(np.argmax(scores))
+                        predicted = CLASS_NAMES[top_index]
+                        confidence = float(scores[top_index]) * 100
+
+                        st.markdown(
+                            f"""
+                            <div class="result-card">
+                                <div class="small-label">Predicted disease / class</div>
+                                <div class="result-name">{DISPLAY_NAMES[predicted]}</div>
+                                <br>
+                                <div class="small-label">Model confidence</div>
+                                <h1>{confidence:.2f}%</h1>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        st.progress(min(max(confidence / 100, 0.0), 1.0))
+
+                        if leaf_score is not None:
+                            st.caption(f"Leaf check passed ✅ (leaf score {leaf_score * 100:.0f}%)")
+
+                        if confidence < 60:
+                            st.warning(
+                                "The model is not very sure. Try a clear, close photo "
+                                "of one leaf."
+                            )
+
+                        st.subheader("🏅 Top 3 Predictions")
+                        top3 = np.argsort(scores)[::-1][:3]
+                        top3_df = pd.DataFrame(
+                            {
+                                "Disease": [DISPLAY_NAMES[CLASS_NAMES[i]] for i in top3],
+                                "Confidence (%)": [round(float(scores[i]) * 100, 2) for i in top3],
+                            }
+                        )
+                        st.table(top3_df)
+
+                        st.subheader("📊 Confidence for All Classes")
+                        chart_df = pd.DataFrame(
+                            {
+                                "Class": [DISPLAY_NAMES[n] for n in CLASS_NAMES],
+                                "Confidence (%)": scores * 100,
+                            }
+                        ).sort_values("Confidence (%)", ascending=False)
+                        st.bar_chart(chart_df.set_index("Class"))
+
+                        st.caption(
+                            f"Model file: {os.path.basename(model_path)} | "
+                            "Confidence is the model's score, not a guarantee."
+                        )
+
+            except Exception as e:
+                st.error(f"Prediction failed: {e}")
+    else:
+        st.markdown(
+            """
+            <div class="result-card">
+                <div class="small-label">Predicted class</div>
+                <div class="result-name">Waiting for image...</div>
+                <p>Upload a leaf photo on the left, then click Predict Disease.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+st.divider()
+st.caption(
+    "TomatoVision AI | AI-based predictions may be incorrect. "
+    "Verify important plant-health decisions with an expert."
+)
