@@ -113,7 +113,7 @@ def color_leaf_check(image):
     small = ImageOps.exif_transpose(image).convert("RGB").resize((128, 128))
     hsv = np.asarray(small.convert("HSV"), dtype=np.float32)
     h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
-    # PIL hue is 0-255 (360 degrees). 28..110 = yellow-orange to green.
+    
     leafy = (h >= 28) & (h <= 110) & (s >= 40) & (v >= 40)
     score = float(leafy.mean())
     return score >= GREEN_MIN, score
@@ -147,7 +147,7 @@ def check_leaf(image):
 def prepare_image(image, size):
     image = ImageOps.exif_transpose(image).convert("RGB")
     image = image.resize((size, size))
-    # NO /255 here. The model already has preprocessing inside it.
+    
     array = np.asarray(image, dtype=np.float32)
     return np.expand_dims(array, axis=0)
 
@@ -270,15 +270,8 @@ with right_col:
                                 "closer photo of one leaf."
                             )
 
-                        st.subheader("🏅 Top 3 Predictions")
-                        top3 = np.argsort(scores)[::-1][:3]
-                        top3_df = pd.DataFrame(
+
                             {
-                                "Disease": [DISPLAY_NAMES[CLASS_NAMES[i]] for i in top3],
-                                "Confidence (%)": [round(float(scores[i]) * 100, 2) for i in top3],
-                            }
-                        )
-                        st.table(top3_df)
 
                         st.subheader("📊 Confidence for All Classes")
                         chart_df = pd.DataFrame(
