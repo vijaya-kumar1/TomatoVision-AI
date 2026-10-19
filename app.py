@@ -50,7 +50,7 @@ def is_tomato_leaf_strict(image):
     skin = (r > 95) & (g > 40) & (b > 20) & (r > g) & (r > b) & (np.abs(r-g) < 45)
     skin_ratio = np.sum(skin) / 10000
     if skin_ratio > 0.12:  
-        return False, "Human photo detected! Please upload only leaf 🧑‍🌾"
+        return False, "Hey Soda puttii olunga leaf image create pannu  🧑‍🌾"
 
     
     green_dominant = np.sum((g > r+10) & (g > b+10)) / 10000
