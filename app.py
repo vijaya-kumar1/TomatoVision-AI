@@ -80,5 +80,4 @@ with right_col:
             if confidence < 70:
                 st.warning(f"⚠️ Low confidence ({confidence:.2f}%). Image may be unclear.")
             st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
-    elif uploaded is None:
-        st.info("👈 Upload image on left side")
+    
