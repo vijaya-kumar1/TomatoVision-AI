@@ -1,4 +1,5 @@
 import glob
+import importlib.util
 import os
 
 
@@ -44,8 +45,10 @@ DISPLAY_NAMES = {
 }
 
 
-LEAF_THRESHOLD = 0.5
+GREEN_MIN = 0.20
 
+
+LEAF_THRESHOLD = 0.5
 LEAF_PROMPTS = [
     "a close-up photo of a tomato leaf",
     "a photo of a diseased tomato plant leaf",
@@ -69,9 +72,7 @@ OTHER_PROMPTS = [
 ALL_PROMPTS = LEAF_PROMPTS + OTHER_PROMPTS
 
 
-# ======================================================
-# 3. LOAD MODELS
-# ======================================================
+
 def find_model():
     """Newest .keras file in the same folder as app.py."""
     matches = glob.glob(os.path.join(BASE_DIR, "*.keras"))
@@ -85,9 +86,16 @@ def load_model(path):
     return tf.keras.models.load_model(path, compile=False)
 
 
+def clip_installed():
+    return (
+        importlib.util.find_spec("torch") is not None
+        and importlib.util.find_spec("transformers") is not None
+    )
+
+
 @st.cache_resource(show_spinner="First time only: loading leaf-check model (about 600 MB download)...")
 def load_clip():
-    """Returns (model, processor) or None if torch / transformers are not installed."""
+    """Returns (model, processor) or None if it cannot be loaded."""
     try:
         from transformers import CLIPModel, CLIPProcessor
 
@@ -99,15 +107,19 @@ def load_clip():
         return None
 
 
-# ======================================================
-# 4. HELPERS
-# ======================================================
-def check_leaf(image):
-    """Returns (is_leaf, leaf_score). Returns (None, None) if the check is not available."""
-    loaded = load_clip()
-    if loaded is None:
-        return None, None
 
+def color_leaf_check(image):
+    """Light check: how much of the photo is green / yellow-green."""
+    small = ImageOps.exif_transpose(image).convert("RGB").resize((128, 128))
+    hsv = np.asarray(small.convert("HSV"), dtype=np.float32)
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    # PIL hue is 0-255 (360 degrees). 28..110 = yellow-orange to green.
+    leafy = (h >= 28) & (h <= 110) & (s >= 40) & (v >= 40)
+    score = float(leafy.mean())
+    return score >= GREEN_MIN, score
+
+
+def clip_leaf_check(image, loaded):
     import torch
 
     clip_model, clip_processor = loaded
@@ -117,8 +129,19 @@ def check_leaf(image):
     with torch.no_grad():
         logits = clip_model(**inputs).logits_per_image[0]
     probs = torch.softmax(logits, dim=0).numpy()
-    leaf_score = float(probs[: len(LEAF_PROMPTS)].sum())
-    return leaf_score >= LEAF_THRESHOLD, leaf_score
+    score = float(probs[: len(LEAF_PROMPTS)].sum())
+    return score >= LEAF_THRESHOLD, score
+
+
+def check_leaf(image):
+    """Returns (is_leaf, score, method_text)."""
+    if clip_installed():
+        loaded = load_clip()
+        if loaded is not None:
+            is_leaf, score = clip_leaf_check(image, loaded)
+            return is_leaf, score, "leaf score"
+    is_leaf, score = color_leaf_check(image)
+    return is_leaf, score, "green leaf area"
 
 
 def prepare_image(image, size):
@@ -129,9 +152,6 @@ def prepare_image(image, size):
     return np.expand_dims(array, axis=0)
 
 
-# ======================================================
-# 5. STYLE
-# ======================================================
 st.markdown(
     """
 <style>
@@ -154,9 +174,7 @@ st.title("🍅 TomatoVision AI")
 st.caption("Tomato Leaf Disease Detection | Upload a leaf image to predict its class")
 st.divider()
 
-# ======================================================
-# 6. LAYOUT
-# ======================================================
+
 left_col, right_col = st.columns([1, 1.2], gap="large")
 
 image = None
@@ -193,30 +211,24 @@ with right_col:
             )
         else:
             try:
-                # ---------- Step 1: is it a leaf photo? ----------
-                is_leaf, leaf_score = check_leaf(image)
+                
+                is_leaf, leaf_score, method = check_leaf(image)
 
-                if is_leaf is False:
+                if not is_leaf:
                     st.markdown(
                         f"""
                         <div class="result-card">
                             <div class="small-label">Result</div>
                             <div class="result-name">Not a leaf image ❌</div>
                             <p>This photo does not look like a tomato leaf
-                            (leaf score: {leaf_score * 100:.0f}%).<br>
+                            ({method}: {leaf_score * 100:.0f}%).<br>
                             Please upload a clear photo of a tomato leaf.</p>
                         </div>
                         """,
                         unsafe_allow_html=True,
                     )
                 else:
-                    if is_leaf is None:
-                        st.info(
-                            "Leaf check is not active. To turn it on, run: "
-                            "pip install torch transformers  (then restart the app)."
-                        )
-
-                    # ---------- Step 2: predict the disease ----------
+                    
                     with st.spinner("Analyzing leaf image..."):
                         model = load_model(model_path)
                         size = model.input_shape[1] or 224
@@ -249,14 +261,13 @@ with right_col:
                             unsafe_allow_html=True,
                         )
                         st.progress(min(max(confidence / 100, 0.0), 1.0))
-
-                        if leaf_score is not None:
-                            st.caption(f"Leaf check passed ✅ (leaf score {leaf_score * 100:.0f}%)")
+                        st.caption(f"Leaf check passed ✅ ({method}: {leaf_score * 100:.0f}%)")
 
                         if confidence < 60:
                             st.warning(
-                                "The model is not very sure. Try a clear, close photo "
-                                "of one leaf."
+                                "The model is not very sure about this leaf. "
+                                "Check the top 3 predictions below, or try a clearer, "
+                                "closer photo of one leaf."
                             )
 
                         st.subheader("🏅 Top 3 Predictions")
