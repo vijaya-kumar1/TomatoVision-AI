@@ -1,11 +1,22 @@
 import os
+import streamlit as st
+st.set_page_config(page_title="TomatoVision AI", page_icon="🍅", layout="wide")
+
 import numpy as np
 import tensorflow as tf
-import streamlit as st
 from PIL import Image, ImageOps
 import gdown
 
-st.set_page_config(page_title="TomatoVision AI", page_icon="🍅", layout="wide")
+MODEL_PATH = "tomato_model_v4.keras"
+GOOGLE_DRIVE_FILE_ID = "1Z-M2gkm79eRnm8HARBIA_c8Jg82Zw4Xg"
+
+if not os.path.exists(MODEL_PATH):
+    try:
+        url = f'https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}'
+        gdown.download(url, MODEL_PATH, quiet=False, fuzzy=True)
+    except Exception as e:
+        st.error(f"Model download failed: {e}. Please check Drive link is 'Anyone with link'")
+        st.stop()
 
 st.markdown("""
 <style>
