@@ -27,7 +27,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "tomato_model_v4.keras")
 CLASS_NAMES = ["Bacterial_spot","Early_blight","Late_blight","Leaf_Mold","Septoria_leaf_spot","Spider_mites","Target_Spot","Yellow_Leaf_Curl_Virus","Mosaic_virus","healthy"]
 
-GOOGLE_DRIVE_FILE_ID = "1Z-M2gkm79eRnm8HARBIA_c8Jg82Zw4Xg"
+GOOGLE_DRIVE_FILE_ID = "https://drive.google.com/file/d/1Z-M2gkm79eRnm8HARBIA_c8Jg82Zw4Xg/view?usp=sharing"
 
 @st.cache_resource
 def load_trained_model():
