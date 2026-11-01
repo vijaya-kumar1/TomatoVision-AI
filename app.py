@@ -27,18 +27,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "tomato_model_v4.keras")
 CLASS_NAMES = ["Bacterial_spot","Early_blight","Late_blight","Leaf_Mold","Septoria_leaf_spot","Spider_mites","Target_Spot","Yellow_Leaf_Curl_Virus","Mosaic_virus","healthy"]
 
-# IMPORTANT: ID mattum - full link vendaam!
+# Only the File ID - Not full URL
 GOOGLE_DRIVE_FILE_ID = "1Z-M2gkm79eRnm8HARBIA_c8Jg82Zw4Xg"
 
 @st.cache_resource
 def load_trained_model():
-    # Model illa nailla illa small ah iruntha download pannu
     if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1000000:
-        with st.spinner("Downloading model... Please wait ⏳ (first time 2 mins)"):
+        with st.spinner("Downloading model... Please wait (first time 2 mins)"):
             try:
                 gdown.download(id=GOOGLE_DRIVE_FILE_ID, output=MODEL_PATH, quiet=False, fuzzy=True)
             except:
-                # Backup method
                 url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
                 gdown.download(url=url, output=MODEL_PATH, quiet=False, fuzzy=True)
     
@@ -67,14 +65,14 @@ def is_tomato_leaf_strict(image):
     green_ratio = (np.sum(is_green) + np.sum(is_yellow_green)*0.7) / 14400.0
 
     if skin_ratio > 0.06:  
-        return False, "Human photo not allowed! Upload only tomato leaf 🧑‍🌾❌"
+        return False, "Human photo not allowed! Upload only tomato leaf"
     if skin_ratio > 0.03 and green_ratio < 0.18: 
-        return False, "Human photo not allowed! Upload only tomato leaf 🧑‍🌾❌"
+        return False, "Human photo not allowed! Upload only tomato leaf"
     white_ratio = np.sum(white_mask) / 14400.0
     if white_ratio > 0.45:
-        return False, "Document/Poster! Upload only leaf 📄"
+        return False, "Document/Poster! Upload only leaf"
     if green_ratio < 0.12:
-        return False, "Not a leaf! Upload only tomato leaf 🍃"
+        return False, "Not a leaf! Upload only tomato leaf"
     return True, "OK"
 
 left_col, right_col = st.columns([1, 1.2], gap="large")
@@ -85,7 +83,7 @@ with left_col:
     if uploaded is not None:
         image = ImageOps.exif_transpose(Image.open(uploaded)).convert("RGB")
         st.image(image, caption="Uploaded Image", width=350)
-        predict_btn = st.button("🔵 Predict Disease")
+        predict_btn = st.button("Predict Disease")
     else:
         predict_btn = False
         image = None
@@ -94,7 +92,7 @@ with right_col:
     if uploaded is not None and predict_btn:
         is_leaf, msg = is_tomato_leaf_strict(image)
         if not is_leaf:
-            st.markdown(f'<div class="error-box"><div class="error-text">❌ {msg}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="error-box"><div class="error-text">{msg}</div></div>', unsafe_allow_html=True)
         else:
             model = load_trained_model()
             input_size = int(model.input_shape[1])
@@ -106,6 +104,6 @@ with right_col:
             pred_index = int(np.argmax(scores))
             pred_name = CLASS_NAMES[pred_index]
             confidence = float(scores[pred_index]) * 100
-            st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="result-box"><div class="disease-text">{pred_name}</div><div class="confidence-text">{confidence:.2f}%</div></div>', unsafe_allow_html=True)
     elif uploaded is None:
         st.info("Upload tomato leaf image")
