@@ -107,3 +107,7 @@ with right_col:
             st.markdown(f'<div class="result-box"><div class="disease-text">{pred_name}</div><div class="confidence-text">{confidence:.2f}%</div></div>', unsafe_allow_html=True)
     elif uploaded is None:
         st.info("Upload tomato leaf image")
+
+
+    import os
+    print("Current files:", os.listdir("."))
