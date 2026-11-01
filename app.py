@@ -10,14 +10,7 @@ import gdown
 MODEL_PATH = "tomato_model_v4.keras"
 GOOGLE_DRIVE_FILE_ID = "1Z-M2gkm79eRnm8HARBIA_c8Jg82Zw4Xg"
 
-if not os.path.exists(MODEL_PATH):
-    try:
-        url = f'https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}'
-        gdown.download(url, MODEL_PATH, quiet=False, fuzzy=True)
-    except Exception as e:
-        st.error(f"Model download failed: {e}. Please check Drive link is 'Anyone with link'")
-        st.stop()
-
+url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"  
 st.markdown("""
 <style>
     .main-title { text-align: center; font-size: 32px; font-weight: bold; }
