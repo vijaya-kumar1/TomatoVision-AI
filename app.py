@@ -27,17 +27,24 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "tomato_model_v4.keras")
 CLASS_NAMES = ["Bacterial_spot","Early_blight","Late_blight","Leaf_Mold","Septoria_leaf_spot","Spider_mites","Target_Spot","Yellow_Leaf_Curl_Virus","Mosaic_virus","healthy"]
 
+# IMPORTANT: ID mattum - full link vendaam!
 GOOGLE_DRIVE_FILE_ID = "1Z-M2gkm79eRnm8HARBIA_c8Jg82Zw4Xg"
 
 @st.cache_resource
 def load_trained_model():
-    if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading model... Please wait ⏳ (first time only - 2 mins)"):
-            gdown.download(id=GOOGLE_DRIVE_FILE_ID, output=MODEL_PATH, quiet=False, fuzzy=True)
+    # Model illa nailla illa small ah iruntha download pannu
+    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1000000:
+        with st.spinner("Downloading model... Please wait ⏳ (first time 2 mins)"):
+            try:
+                gdown.download(id=GOOGLE_DRIVE_FILE_ID, output=MODEL_PATH, quiet=False, fuzzy=True)
+            except:
+                # Backup method
+                url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
+                gdown.download(url=url, output=MODEL_PATH, quiet=False, fuzzy=True)
     
     try:
         return tf.keras.models.load_model(MODEL_PATH, compile=False)
-    except Exception as e:
+    except Exception:
         return tf.keras.models.load_model(MODEL_PATH, compile=False, safe_mode=False)
 
 def is_tomato_leaf_strict(image):
@@ -61,17 +68,13 @@ def is_tomato_leaf_strict(image):
 
     if skin_ratio > 0.06:  
         return False, "Human photo not allowed! Upload only tomato leaf 🧑‍🌾❌"
-    
     if skin_ratio > 0.03 and green_ratio < 0.18: 
         return False, "Human photo not allowed! Upload only tomato leaf 🧑‍🌾❌"
-
     white_ratio = np.sum(white_mask) / 14400.0
     if white_ratio > 0.45:
         return False, "Document/Poster! Upload only leaf 📄"
-
     if green_ratio < 0.12:
         return False, "Not a leaf! Upload only tomato leaf 🍃"
-
     return True, "OK"
 
 left_col, right_col = st.columns([1, 1.2], gap="large")
@@ -105,4 +108,4 @@ with right_col:
             confidence = float(scores[pred_index]) * 100
             st.markdown(f'<div class="result-box"><div class="disease-text">🦠 {pred_name}</div><div class="confidence-text">📊 {confidence:.2f}%</div></div>', unsafe_allow_html=True)
     elif uploaded is None:
-        st.info(" Upload tomato leaf image")
+        st.info("Upload tomato leaf image")
