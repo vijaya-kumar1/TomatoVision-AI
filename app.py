@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import streamlit as st
 from PIL import Image, ImageOps
+import gdown
 
 st.set_page_config(page_title="TomatoVision AI", page_icon="🍅", layout="wide")
 
@@ -26,9 +27,20 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "tomato_model_v4.keras")
 CLASS_NAMES = ["Bacterial_spot","Early_blight","Late_blight","Leaf_Mold","Septoria_leaf_spot","Spider_mites","Target_Spot","Yellow_Leaf_Curl_Virus","Mosaic_virus","healthy"]
 
+
+GOOGLE_DRIVE_FILE_ID = "1Z-M2gkm79eRnm8HARBIA_c8Jg82Zw4Xg"
+
 @st.cache_resource
 def load_trained_model():
-    return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    if not os.path.exists(MODEL_PATH):
+        with st.spinner("Downloading model... Please wait ⏳ (first time only)"):
+            url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
+            gdown.download(url, MODEL_PATH, quiet=False)
+    
+    try:
+        return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    except:
+        return tf.keras.models.load_model(MODEL_PATH, compile=False, safe_mode=False)
 
 def is_tomato_leaf_strict(image):
     img_small = image.resize((120, 120))
@@ -42,16 +54,13 @@ def is_tomato_leaf_strict(image):
     white_mask = (max_rgb > 195) & (sat < 0.25)
     valid = ~white_mask
     
-    
     skin = (r > 95) & (g > 35) & (b > 15) & (r > g+15) & (r > b+10) & (r-g > 15) & (r-g < 85) & valid
     skin_ratio = np.sum(skin) / 14400.0
-    
     
     is_green = (g == max_rgb) & (sat > 0.18) & (max_rgb > 30) & (max_rgb < 230) & valid
     is_yellow_green = (g > 50) & (r > 40) & (b < 135) & (g >= r*0.6) & (sat > 0.16) & valid
     green_ratio = (np.sum(is_green) + np.sum(is_yellow_green)*0.7) / 14400.0
 
-    
     if skin_ratio > 0.06:  
         return False, "Human photo not allowed! Upload only tomato leaf 🧑‍🌾❌"
     
