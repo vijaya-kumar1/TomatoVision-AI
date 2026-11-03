@@ -19,7 +19,7 @@ def load_trained_model():
                 url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
                 gdown.download(url, MODEL_PATH, quiet=False, fuzzy=True)
             except Exception as e:
-                st.error(f"Model download failed: {e}. Drive link public ah check pannu da!")
+                st.error(f"Model download failed: {e}. check tha drive link private!")
                 st.stop()
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
@@ -32,7 +32,7 @@ CLASS_NAMES = ['Tomato_Bacterial_spot', 'Tomato_Early_blight', 'Tomato_Late_blig
 model = load_trained_model()
 
 st.title("🍅 TomatoVision AI - Leaf Disease Detector")
-st.write("Tomato leaf photo va upload pannu da, disease enna nu naan solluren!")
+st.write("Tomato leaf upload the image,find the disease!")
 
 uploaded_file = st.file_uploader("Choose a tomato leaf image...", type=["jpg", "png", "jpeg"])
 
