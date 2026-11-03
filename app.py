@@ -15,9 +15,8 @@ GOOGLE_DRIVE_FILE_ID = "1Z-M2gkm79eRnMBHARBIA_c83gB2zW4Xg"
 def load_trained_model():
     if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1000000:
         with st.spinner("Model download panren da... First time 2 mins VJ!"):
-            try:
-                url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
-                gdown.download(url, MODEL_PATH, quiet=False)
+                 try:
+            gdown.download(id=GOOGLE_DRIVE_FILE_ID, output=MODEL_PATH, quiet=False)
             except Exception as e:
                 st.error(f"Model download failed: {e}. check tha drive link private!")
                 st.stop()
