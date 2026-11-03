@@ -9,7 +9,7 @@ st.set_page_config(page_title="TomatoVision AI", page_icon="🍅", layout="wide"
 
 
 MODEL_PATH = "tomato_model_v4.keras"
-GOOGLE_DRIVE_FILE_ID = "1-0A2j9k0XvXvXvXvXvXvXvXvXvXvXvX" 
+GOOGLE_DRIVE_FILE_ID = "1Z-M2gkm79eRnMBHARBIA_c83gB2zW4Xg"
 
 @st.cache_resource
 def load_trained_model():
@@ -36,13 +36,15 @@ st.write("Tomato leaf photo va upload pannu da, disease enna nu naan solluren!")
 
 uploaded_file = st.file_uploader("Choose a tomato leaf image...", type=["jpg", "png", "jpeg"])
 
+uploaded_file = st.file_uploader("Tomato leaf photo va upload pannu da...", type=["jpg", "png", "jpeg"])
+
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert('RGB')
     st.image(image, caption='Uploaded Leaf', use_column_width=True)
     
     if st.button("Disease Kandu Pidi"):
         with st.spinner("Analyzing..."):
-            img = image.resize((224, 224)) 
+            img = image.resize((224, 224))
             img_array = np.array(img) / 255.0
             img_array = np.expand_dims(img_array, axis=0)
             
@@ -50,5 +52,6 @@ if uploaded_file is not None:
             predicted_class = CLASS_NAMES[np.argmax(prediction)]
             confidence = np.max(prediction) * 100
             
-            st.success(f"**Prediction: {predicted_class}**")
+            st.success(f"Prediction: {predicted_class}")
             st.info(f"Confidence: {confidence:.2f}%")
+            
