@@ -36,7 +36,6 @@ st.write("Tomato leaf upload the image,find the disease!")
 
 uploaded_file = st.file_uploader("Choose a tomato leaf image...", type=["jpg", "png", "jpeg"])
 
-uploaded_file = st.file_uploader("Tomato leaf photo va upload pannu da...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert('RGB')
