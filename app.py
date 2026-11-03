@@ -17,7 +17,7 @@ def load_trained_model():
         with st.spinner("Model download panren da... First time 2 mins VJ!"):
             try:
                 url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
-                gdown.download(url, MODEL_PATH, quiet=False, fuzzy=True)
+                gdown.download(url, MODEL_PATH, quiet=False)
             except Exception as e:
                 st.error(f"Model download failed: {e}. check tha drive link private!")
                 st.stop()
