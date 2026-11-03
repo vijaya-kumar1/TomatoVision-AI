@@ -1,6 +1,4 @@
 streamlit
-numpy==1.26.4
-tensorflow==2.15.0
+tensorflow
 pillow
 gdown
-protobuf==4.25.3
