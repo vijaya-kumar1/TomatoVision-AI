@@ -22,8 +22,7 @@ An AI-powered solution to help farmers detect tomato plant diseases early and pr
 - Streamlit for UI
 - Convolutional Neural Network (CNN)
 
-### 🔗 Model & Notebook Download
-Model file large ah irukka, Drive la irukku:
+### 🔗 Model & Notebook Download,
 - **📓 Jupyter Notebook:** [Download Notebook](https://drive.google.com/file/d/10takfxKHgRRlKzExXEHUG6CCc7XpNCEZ/view?usp=sharing)
 - **🧠 Model File:** [Will be added soon - tomato_model_v4.keras]
 
